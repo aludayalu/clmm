@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@stellar/stellar-sdk": "^13.3.0",
+    "soroban-client": "^1.0.1",
+    "stellar-sdk": "^13.3.0"
+  }
+}
