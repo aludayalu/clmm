@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, token, Address, Env, IntoVal, Symbol, TryFromVal, Val, contracttype,
+use soroban_sdk::{contract, contractimpl, Address, Env, IntoVal, Symbol, TryFromVal, Val, contracttype,
     Map
 };
 
@@ -24,8 +24,9 @@ pub fn key_exists(env: &Env, key: &str) -> bool {
 
 #[contracttype]
 pub struct PoolState {
-    current_price: u128, //  number of a per b also price is price * 1e6 so we can represent upto 6 decimal places
+    current_price: u128, //  number of XLM per a also price is price * 1e6 so we can represent upto 6 decimal places
     current_tick: i32,
+    base_price_at_tick: u128,
     current_liquidity_a: u128,
     current_liquidity_b: u128,
     ticks: Map<i32, Tick>,
@@ -59,24 +60,25 @@ impl CLMM {
         let mut state = PoolState{
             current_price: starting_price,
             current_tick: 0,
+            base_price_at_tick: starting_price,
             current_liquidity_a: 0,
             current_liquidity_b: 0,
             ticks: Map::new(&env),
             positions: Map::new(&env),
-            balances: Map::new(&env)
+            balances: Map::new(&env),
         };
 
         state.balances.set(user, 1000000);
 
-        set_value(&env, "state", &state);
-        
         let tick_0 = Tick{
             index: 0,
             delta_a: 0,
             delta_b: 0
         };
-        
-        set_value(&env, "tick_0", &tick_0);
+
+        state.ticks.set(0, tick_0);
+
+        set_value(&env, "state", &state);
 
         finish_function(env);
 
@@ -86,7 +88,7 @@ impl CLMM {
     pub fn open_position(env: Env, amount_a_in: u128, tick_offset: u32, user: Address, random_position_id: u128) -> bool {
         let mut state: PoolState = get_value(&env, "state");
 
-        let amount_b_in = amount_a_in * 1000000 / state.current_price; // as the current price is multiplied by 1e6
+        let amount_b_in = (amount_a_in * 1000000) / state.current_price; // as the current price is multiplied by 1e6
 
         let mut user_b_balance = state.balances.try_get(user.clone()).unwrap().expect("bruh");
 
@@ -137,5 +139,104 @@ impl CLMM {
     pub fn get_balance(env: Env, user: Address) -> u128 {
         let state: PoolState = get_value(&env, "state");
         return state.balances.try_get(user).unwrap().expect("bruh")
+    }
+
+    pub fn swap(env: Env, amountIn: u128, isXLM: bool, user: Address) -> u128 {
+        let mut state: PoolState = get_value(&env, "state");
+        let mut amountRemaining = amountIn;
+        let mut toGive = 0;
+        if isXLM {
+            let mut iterations = 0;
+            while iterations < 100 {
+                iterations += 1;
+                if !state.ticks.contains_key(state.current_tick) {
+                    state.ticks.set(state.current_tick, Tick { index: state.current_tick, delta_a: 0, delta_b: 0 });
+                }
+                let mut current_tick = state.ticks.get(state.current_tick).unwrap();
+                let max_can_provide_swap = (state.current_price * state.current_liquidity_b) / 1000000;
+                if max_can_provide_swap > amountRemaining {
+                    let mut initialRatioThousand = state.current_liquidity_b * 1000;
+                    if state.current_liquidity_a != 0 {
+                        initialRatioThousand /= state.current_liquidity_a;
+                    }
+                    state.current_liquidity_a += amountRemaining;
+                    current_tick.delta_a += amountRemaining as i128;
+                    toGive = (amountRemaining * 1000000) / state.current_price;
+                    state.current_liquidity_b-=toGive;
+                    current_tick.delta_b -= toGive as i128;
+                    state.ticks.set(state.current_tick, current_tick);
+                    let priceLower = state.base_price_at_tick;
+                    let priceUpper = (state.base_price_at_tick * 101) / 100;
+                    let newRatioThousand = (state.current_liquidity_b * 1000 / state.current_liquidity_a);
+                    let netChange = ((priceUpper - priceLower) * (newRatioThousand * 100) / initialRatioThousand) / 100;
+                    state.current_price = priceUpper - netChange;
+                    amountRemaining = 0;
+                    break;
+                } else {
+                    state.current_liquidity_a += max_can_provide_swap;
+                    current_tick.delta_a += max_can_provide_swap as i128;
+                    state.current_price = (state.base_price_at_tick * 101) / 100;
+                    toGive += state.current_liquidity_b;
+                    current_tick.delta_b -= state.current_liquidity_b as i128;
+                    state.current_liquidity_b = 0;
+                    amountRemaining -= max_can_provide_swap;
+                    state.base_price_at_tick = state.current_price;
+                    state.current_tick += 1;
+                }
+            }
+            if iterations == 100 {
+                panic!("Too many iterations, cannot provide swap")
+            }
+        } else {
+            let mut iterations = 0;
+            while iterations < 100 {
+                iterations += 1;
+                if !state.ticks.contains_key(state.current_tick) {
+                    state.ticks.set(state.current_tick, Tick { index: state.current_tick, delta_a: 0, delta_b: 0 });
+                }
+                let mut current_tick = state.ticks.get(state.current_tick).unwrap();
+                let max_can_provide_swap = (state.current_liquidity_a * 1000000) / state.current_price;
+                if max_can_provide_swap > amountRemaining {
+                    let mut initialRatioThousand = state.current_liquidity_b * 1000;
+                    if state.current_liquidity_a != 0 {
+                        initialRatioThousand /= state.current_liquidity_a;
+                    }
+                    state.current_liquidity_b += amountRemaining;
+                    current_tick.delta_b += amountRemaining as i128;
+                    toGive = (state.current_price * amountRemaining) / 1000000;
+                    amountRemaining = 0;
+                    state.current_liquidity_a-=toGive;
+                    current_tick.delta_a -= toGive as i128;
+                    state.ticks.set(state.current_tick, current_tick);
+                    let priceLower = state.base_price_at_tick;
+                    let priceUpper = (state.base_price_at_tick * 101) / 100;
+                    let newRatioThousand = (state.current_liquidity_b * 1000 / state.current_liquidity_a);
+                    let netChange = ((priceUpper - priceLower) * (newRatioThousand * 100) / initialRatioThousand) / 100;
+                    state.current_price = priceUpper - netChange;
+                    break;
+                } else {
+                    state.current_liquidity_b += max_can_provide_swap;
+                    current_tick.delta_b += max_can_provide_swap as i128;
+                    state.current_price = (state.base_price_at_tick * 99) / 100;
+                    toGive += state.current_liquidity_a;
+                    current_tick.delta_a -= state.current_liquidity_a as i128;
+                    state.current_liquidity_a = 0;
+                    amountRemaining -= max_can_provide_swap;
+                    state.base_price_at_tick = state.current_price;
+                    state.current_tick -= 1;
+                }
+            }
+            if iterations == 100 {
+                panic!("Too many iterations, cannot provide swap")
+            }
+        }
+
+        let bal = state.balances.get(user.clone()).unwrap();
+        state.balances.set(user.clone(), bal + toGive);
+
+        set_value(&env, "state", &state);
+
+        finish_function(env);
+        return toGive;
     }
 }
