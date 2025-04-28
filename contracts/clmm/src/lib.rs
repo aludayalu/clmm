@@ -193,7 +193,7 @@ impl CLMM {
                     state.current_tick += 1;
                 }
             }
-            if iterations == 100 {
+            if iterations == 2 {
                 state.current_price = (state.base_price_at_tick * 110) / 100;
                 state.base_price_at_tick = state.current_price;
                 state.current_tick += 1;
@@ -242,7 +242,7 @@ impl CLMM {
                     state.current_tick -= 1;
                 }
             }
-            if iterations == 100 {
+            if iterations == 2 {
                 state.current_price = (state.base_price_at_tick * 90) / 100;
                 state.base_price_at_tick = state.current_price;
                 state.current_tick += 1;
