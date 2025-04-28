@@ -208,11 +208,11 @@ impl CLMM {
                     state.current_liquidity_a-=toGive;
                     current_tick.delta_a -= toGive as i128;
                     state.ticks.set(state.current_tick, current_tick);
-                    let priceLower = (state.base_price_at_tick * 99) / 100;
-                    let priceBaseCurrentTick = state.base_price_at_tick ;
+                    let priceBaseCurrentTick = state.base_price_at_tick;
+                    let priceUpper = (state.base_price_at_tick * 101) / 100 ;
                     let newRatioThousand = (state.current_liquidity_b * 1000 / state.current_liquidity_a);
-                    let netChange = ((priceBaseCurrentTick - priceLower) * (newRatioThousand * 100) / initialRatioThousand) / 100;
-                    state.current_price = priceLower + netChange;
+                    let netChange = ((priceUpper - priceBaseCurrentTick) * (newRatioThousand * 100) / initialRatioThousand) / 100;
+                    state.current_price = priceBaseCurrentTick + netChange;
                     break;
                 } else {
                     state.current_liquidity_b += max_can_provide_swap;
