@@ -1,6 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, IntoVal, Symbol, TryFromVal, Val, contracttype,
-    Map
+use soroban_sdk::{contract, contractimpl, contracttype, log, Address, Env, IntoVal, Map, Symbol, TryFromVal, Val
 };
 
 #[contract]
@@ -124,10 +123,10 @@ impl CLMM {
         state.ticks.set(lower_tick_index, lower_tick);
         state.ticks.set(upper_tick_index, upper_tick);
 
-        state.current_liquidity_a += amount_a_in;
-        state.current_liquidity_b += amount_b_in;
-
         state.positions.set(random_position_id, Position { user: user, starting_tick: state.current_tick, tick_offset: tick_offset, amount_a: amount_a_in, amount_b: amount_b_in });
+
+        state.current_liquidity_a += (amount_a_in / (tick_offset as u128));
+        state.current_liquidity_b += (amount_b_in / (tick_offset as u128));
 
         set_value(&env, "state", &state);
 
@@ -141,10 +140,11 @@ impl CLMM {
         return state.balances.try_get(user).unwrap().expect("bruh")
     }
 
-    pub fn swap(env: Env, amountIn: u128, isXLM: bool, user: Address) -> u128 {
+    pub fn swap(env: Env, amountIn: u128, isXLM: bool, user: Address) -> i128 {
         let mut state: PoolState = get_value(&env, "state");
         let mut amountRemaining = amountIn;
         let mut toGive = 0;
+        env.events().publish((), "1");
         if isXLM {
             let mut iterations = 0;
             while iterations < 100 {
@@ -152,30 +152,39 @@ impl CLMM {
                 if !state.ticks.contains_key(state.current_tick) {
                     state.ticks.set(state.current_tick, Tick { index: state.current_tick, delta_a: 0, delta_b: 0 });
                 }
+                env.events().publish((), "2");
                 let mut current_tick = state.ticks.get(state.current_tick).unwrap();
                 let max_can_provide_swap = (state.current_price * state.current_liquidity_b) / 1000000;
+                env.events().publish((), amountIn);
+                env.events().publish((), max_can_provide_swap);
                 if max_can_provide_swap > amountRemaining {
+                    env.events().publish((), "4");
                     let mut initialRatioThousand = state.current_liquidity_b * 1000;
                     if state.current_liquidity_a != 0 {
                         initialRatioThousand /= state.current_liquidity_a;
                     }
+                    env.events().publish((), "5");
                     state.current_liquidity_a += amountRemaining;
                     current_tick.delta_a += amountRemaining as i128;
+                    env.events().publish((), "6");
                     toGive = (amountRemaining * 1000000) / state.current_price;
                     state.current_liquidity_b-=toGive;
+                    env.events().publish((), "7");
                     current_tick.delta_b -= toGive as i128;
                     state.ticks.set(state.current_tick, current_tick);
+                    env.events().publish((), "8");
                     let priceLower = state.base_price_at_tick;
-                    let priceUpper = (state.base_price_at_tick * 101) / 100;
+                    let priceUpper = (state.base_price_at_tick * 110) / 100;
                     let newRatioThousand = (state.current_liquidity_b * 1000 / state.current_liquidity_a);
-                    let netChange = ((priceUpper - priceLower) * (newRatioThousand * 100) / initialRatioThousand) / 100;
-                    state.current_price = priceUpper - netChange;
+                    let netChange = ((state.current_price) * (newRatioThousand * 100) / initialRatioThousand) / (100 * 100);
+                    state.current_price = state.current_price + netChange;
+                    env.events().publish((), "9");
                     amountRemaining = 0;
                     break;
                 } else {
                     state.current_liquidity_a += max_can_provide_swap;
                     current_tick.delta_a += max_can_provide_swap as i128;
-                    state.current_price = (state.base_price_at_tick * 101) / 100;
+                    state.current_price = (state.base_price_at_tick * 110) / 100;
                     toGive += state.current_liquidity_b;
                     current_tick.delta_b -= state.current_liquidity_b as i128;
                     state.current_liquidity_b = 0;
@@ -185,7 +194,14 @@ impl CLMM {
                 }
             }
             if iterations == 100 {
-                panic!("Too many iterations, cannot provide swap")
+                state.current_price = (state.base_price_at_tick * 110) / 100;
+                state.base_price_at_tick = state.current_price;
+                state.current_tick += 1;
+                if !state.ticks.contains_key(state.current_tick) {
+                    state.ticks.set(state.current_tick, Tick { index: state.current_tick, delta_a: 0, delta_b: 0 });
+                }
+                set_value(&env, "state", &state);
+                return 0;
             }
         } else {
             let mut iterations = 0;
@@ -209,15 +225,15 @@ impl CLMM {
                     current_tick.delta_a -= toGive as i128;
                     state.ticks.set(state.current_tick, current_tick);
                     let priceBaseCurrentTick = state.base_price_at_tick;
-                    let priceUpper = (state.base_price_at_tick * 101) / 100 ;
+                    let priceUpper = (state.base_price_at_tick * 110) / 100 ;
                     let newRatioThousand = (state.current_liquidity_b * 1000 / state.current_liquidity_a);
-                    let netChange = ((priceUpper - priceBaseCurrentTick) * (newRatioThousand * 100) / initialRatioThousand) / 100;
-                    state.current_price = priceBaseCurrentTick + netChange;
+                    let netChange = ((state.current_price) * (newRatioThousand * 100) / initialRatioThousand) / (100 * 100);
+                    state.current_price = state.current_price - netChange;
                     break;
                 } else {
                     state.current_liquidity_b += max_can_provide_swap;
                     current_tick.delta_b += max_can_provide_swap as i128;
-                    state.current_price = (state.base_price_at_tick * 99) / 100;
+                    state.current_price = (state.base_price_at_tick * 90) / 100;
                     toGive += state.current_liquidity_a;
                     current_tick.delta_a -= state.current_liquidity_a as i128;
                     state.current_liquidity_a = 0;
@@ -227,7 +243,14 @@ impl CLMM {
                 }
             }
             if iterations == 100 {
-                panic!("Too many iterations, cannot provide swap")
+                state.current_price = (state.base_price_at_tick * 90) / 100;
+                state.base_price_at_tick = state.current_price;
+                state.current_tick += 1;
+                if !state.ticks.contains_key(state.current_tick) {
+                    state.ticks.set(state.current_tick, Tick { index: state.current_tick, delta_a: 0, delta_b: 0 });
+                }
+                set_value(&env, "state", &state);
+                return 0;
             }
         }
 
@@ -237,6 +260,6 @@ impl CLMM {
         set_value(&env, "state", &state);
 
         finish_function(env);
-        return toGive;
+        return toGive as i128;
     }
 }

@@ -2,7 +2,7 @@ from stellar_sdk import Network, Keypair, TransactionBuilder, Server, SorobanSer
 from stellar_sdk.soroban_rpc import GetTransactionStatus, SendTransactionStatus
 import time
 
-def execute(function, kp, contract, args=[], simulate=False):
+def execute(function, kp, contract, args=[], simulate=False, printLogs=False):
     rpc = Server("http://localhost:8000")
     account = rpc.load_account(kp.public_key)
     tx = (
@@ -22,10 +22,15 @@ def execute(function, kp, contract, args=[], simulate=False):
     rps = SorobanServer("http://localhost:8000/soroban/rpc")
     if simulate:
         tx = rps.simulate_transaction(tx)
+        if printLogs:
+            for x in tx.events[2:]:
+                print(stellar_xdr.DiagnosticEvent.from_xdr(x).event)
+            return
         return stellar_xdr.SCVal.from_xdr(tx.results[0].xdr)
     try:
         tx = rps.prepare_transaction(tx)
     except Exception as e:
+        print(e)
         print(e.simulate_transaction_response)
         exit()
     tx.sign(kp)
@@ -36,11 +41,11 @@ def execute(function, kp, contract, args=[], simulate=False):
         result = rps.get_transaction(res.hash)
         if result.status != GetTransactionStatus.NOT_FOUND:
             break
-        time.sleep(3)
+        time.sleep(1)
     if result.status == GetTransactionStatus.SUCCESS:
         transaction_meta_xdr = result.result_meta_xdr
     else:
-        raise Exception(result.result_xdr)
+        raise Exception(stellar_xdr.TransactionResult.from_xdr(result.result_xdr))
     tx_meta = stellar_xdr.TransactionMeta.from_xdr(result.result_meta_xdr)
     scval = tx_meta.v3.soroban_meta.return_value
     return scval
