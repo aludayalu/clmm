@@ -1,37 +1,42 @@
+"""
+Soroban CLMM Contract Python Wrapper
+
+This script provides a complete Python wrapper for interacting with the 
+Constant Liquidity Market Maker (CLMM) smart contract on Soroban.
+"""
+
 import contract
 
 
-def init(user: str, starting_price: int) -> bool:
+def init(kp, contract_id, user: str, starting_price: int):
     """
     Initialize the CLMM contract with a starting price.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         user: Address of the initializing user
         starting_price: Initial price (multiplied by 1e6 for decimal precision)
-        
-    Returns:
-        bool: True if initialization was successful, False otherwise
     """
-    return contract.execute("init", [
+    return contract.execute("init", kp, contract_id, args=[
         contract.scval.to_address(user), 
         contract.scval.to_uint128(starting_price)
     ])
 
 
-def open_position(amount_a_in: int, tick_offset: int, user: str, random_position_id: int) -> bool:
+def open_position(kp, contract_id, amount_a_in: int, tick_offset: int, user: str, random_position_id: int):
     """
     Open a new liquidity position.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         amount_a_in: Amount of token A to deposit
         tick_offset: Range of ticks for the position (symmetric around current tick)
         user: Address of the position owner
         random_position_id: Unique identifier for the position
-        
-    Returns:
-        bool: True if position was successfully opened, False otherwise
     """
-    return contract.execute("open_position", [
+    return contract.execute("open_position", kp, contract_id, args=[
         contract.scval.to_uint128(amount_a_in),
         contract.scval.to_uint32(tick_offset),
         contract.scval.to_address(user),
@@ -39,136 +44,123 @@ def open_position(amount_a_in: int, tick_offset: int, user: str, random_position
     ])
 
 
-def close_position(position_id: int, user: str) -> None:
+def close_position(kp, contract_id, position_id: int, user: str):
     """
     Close an existing liquidity position.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         position_id: ID of the position to close
         user: Address of the position owner
     """
-    contract.execute("close_position", [
+    return contract.execute("close_position", kp, contract_id, args=[
         contract.scval.to_uint128(position_id),
         contract.scval.to_address(user)
     ])
 
 
-def get_position(position_id: int) -> dict:
+def get_position(contract_id, position_id: int):
     """
     Get details about a specific position.
     
     Args:
+        contract_id: The contract ID
         position_id: ID of the position to query
-        
-    Returns:
-        dict: Position details containing user, starting_tick, tick_offset, amount_a, amount_b
     """
-    result = contract.execute("get_position", [contract.scval.to_uint128(position_id)])
-    # Parse the Position struct to a Python dict
-    return {
-        "user": result["user"],
-        "starting_tick": result["starting_tick"],
-        "tick_offset": result["tick_offset"],
-        "amount_a": result["amount_a"],
-        "amount_b": result["amount_b"]
-    }
+    return contract.execute("get_position", None, contract_id, args=[
+        contract.scval.to_uint128(position_id)
+    ], simulate=True)
 
 
-def get_tick(tick_index: int) -> dict:
+def get_tick(contract_id, tick_index: int):
     """
     Get details about a specific tick.
     
     Args:
+        contract_id: The contract ID
         tick_index: Index of the tick to query
-        
-    Returns:
-        dict: Tick details containing index, delta_a, delta_b
     """
-    result = contract.execute("get_tick", [contract.scval.to_int32(tick_index)])
-    # Parse the Tick struct to a Python dict
-    return {
-        "index": result["index"],
-        "delta_a": result["delta_a"],
-        "delta_b": result["delta_b"]
-    }
+    return contract.execute("get_tick", None, contract_id, args=[
+        contract.scval.to_int32(tick_index)
+    ], simulate=True)
 
 
-def get_current_price() -> int:
+def get_current_price(contract_id):
     """
     Get the current price in the pool.
     
-    Returns:
-        int: Current price (multiplied by 1e6)
+    Args:
+        contract_id: The contract ID
     """
-    return contract.execute("get_current_price", [])
+    return contract.execute("get_current_price", None, contract_id, args=[], simulate=True)
 
 
-def get_base_price_at_tick() -> int:
+def get_base_price_at_tick(contract_id):
     """
     Get the base price at the current tick.
     
-    Returns:
-        int: Base price at tick (multiplied by 1e6)
+    Args:
+        contract_id: The contract ID
     """
-    return contract.execute("get_base_price_at_tick", [])
+    return contract.execute("get_base_price_at_tick", None, contract_id, args=[], simulate=True)
 
 
-def get_current_tick() -> int:
+def get_current_tick(contract_id):
     """
     Get the current tick index.
     
-    Returns:
-        int: Current tick index
+    Args:
+        contract_id: The contract ID
     """
-    return contract.execute("get_current_tick", [])
+    return contract.execute("get_current_tick", None, contract_id, args=[], simulate=True)
 
 
-def get_current_liquidity_a() -> int:
+def get_current_liquidity_a(contract_id):
     """
     Get the current liquidity of token A.
     
-    Returns:
-        int: Current liquidity of token A
+    Args:
+        contract_id: The contract ID
     """
-    return contract.execute("get_current_liquidity_a", [])
+    return contract.execute("get_current_liquidity_a", None, contract_id, args=[], simulate=True)
 
 
-def get_current_liquidity_b() -> int:
+def get_current_liquidity_b(contract_id):
     """
     Get the current liquidity of token B.
     
-    Returns:
-        int: Current liquidity of token B
+    Args:
+        contract_id: The contract ID
     """
-    return contract.execute("get_current_liquidity_b", [])
+    return contract.execute("get_current_liquidity_b", None, contract_id, args=[], simulate=True)
 
 
-def get_balance(user: str) -> int:
+def get_balance(contract_id, user: str):
     """
     Get the balance of a user.
     
     Args:
+        contract_id: The contract ID
         user: Address of the user
-        
-    Returns:
-        int: User's balance
     """
-    return contract.execute("get_balance", [contract.scval.to_address(user)])
+    return contract.execute("get_balance", None, contract_id, args=[
+        contract.scval.to_address(user)
+    ], simulate=True)
 
 
-def swap(amount_in: int, is_xlm: bool, user: str) -> int:
+def swap(kp, contract_id, amount_in: int, is_xlm: bool, user: str):
     """
     Perform a swap operation.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         amount_in: Amount of tokens to swap
         is_xlm: True if swapping XLM for the other token, False otherwise
         user: Address of the user performing the swap
-        
-    Returns:
-        int: Amount of tokens received from the swap
     """
-    return contract.execute("swap", [
+    return contract.execute("swap", kp, contract_id, args=[
         contract.scval.to_uint128(amount_in),
         contract.scval.to_bool(is_xlm),
         contract.scval.to_address(user)

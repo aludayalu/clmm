@@ -8,24 +8,30 @@ Lightning payment channel smart contract on Soroban.
 import contract
 
 
-def constructor():
+def constructor(kp, contract_id):
     """
     Initialize the Lightning contract.
+    
+    Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
     """
-    return contract.execute("__constructor", [])
+    return contract.execute("__constructor", kp, contract_id, args=[])
 
 
-def start_channel(user_a: str, user_b: str, amount: int, channel_id: int) -> None:
+def start_channel(kp, contract_id, user_a: str, user_b: str, amount: int, channel_id: int):
     """
     Start a new payment channel between two users.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         user_a: Address of the first user
         user_b: Address of the second user
         amount: Initial amount to fund the channel
         channel_id: Unique identifier for the channel
     """
-    return contract.execute("start_channel", [
+    return contract.execute("start_channel", kp, contract_id, args=[
         contract.scval.to_address(user_a),
         contract.scval.to_address(user_b),
         contract.scval.to_uint128(amount),
@@ -33,36 +39,36 @@ def start_channel(user_a: str, user_b: str, amount: int, channel_id: int) -> Non
     ])
 
 
-def add_money(channel_id: int, amount: int) -> None:
+def add_money(kp, contract_id, channel_id: int, amount: int):
     """
     Add more funds to an existing payment channel.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         channel_id: ID of the channel to add funds to
         amount: Amount to add to the channel
     """
-    return contract.execute("add_money", [
+    return contract.execute("add_money", kp, contract_id, args=[
         contract.scval.to_uint128(channel_id),
         contract.scval.to_uint128(amount)
     ])
 
 
-def provide_signatures(channel_id: int, payload: bytes, pubkey: bytes, input_a: bytes, input_b: bytes) -> None:
+def provide_signatures(kp, contract_id, channel_id: int, payload: bytes, pubkey: bytes, input_a: bytes, input_b: bytes):
     """
     Provide signatures for a payment channel update.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         channel_id: ID of the channel
         payload: The payload data
         pubkey: 32-byte public key for signature verification
         input_a: Signatures from user A
         input_b: Signatures from user B
     """
-    # Ensure pubkey is exactly 32 bytes
-    if len(pubkey) != 32:
-        raise ValueError("Public key must be exactly 32 bytes")
-    
-    return contract.execute("provide_signatures", [
+    return contract.execute("provide_signatures", kp, contract_id, args=[
         contract.scval.to_uint128(channel_id),
         contract.scval.to_bytes(payload),
         contract.scval.to_bytes_n(pubkey),
@@ -71,63 +77,48 @@ def provide_signatures(channel_id: int, payload: bytes, pubkey: bytes, input_a: 
     ])
 
 
-def close_channel(channel_id: int, user_a: str, user_b: str) -> None:
+def close_channel(kp, contract_id, channel_id: int, user_a: str, user_b: str):
     """
     Close a payment channel and distribute funds according to the final state.
     
     Args:
+        kp: Key pair for transaction signing
+        contract_id: The contract ID
         channel_id: ID of the channel to close
         user_a: Address of the first user
         user_b: Address of the second user
     """
-    return contract.execute("close_channel", [
+    return contract.execute("close_channel", kp, contract_id, args=[
         contract.scval.to_uint128(channel_id),
         contract.scval.to_address(user_a),
         contract.scval.to_address(user_b)
     ])
 
 
-def get_channels(user: str) -> list:
+def get_channels(contract_id, user: str):
     """
     Get all channel IDs associated with a user.
     
     Args:
+        contract_id: The contract ID
         user: Address of the user
-        
-    Returns:
-        list: List of channel IDs
     """
-    result = contract.execute("get_channels", [contract.scval.to_address(user)])
-    # Convert the result to a Python list
-    return [int(channel_id) for channel_id in result]
+    return contract.execute("get_channels", None, contract_id, args=[
+        contract.scval.to_address(user)
+    ], simulate=True)
 
 
-def get_channel(channel_id: int) -> dict:
+def get_channel(contract_id, channel_id: int):
     """
     Get details about a specific channel.
     
     Args:
+        contract_id: The contract ID
         channel_id: ID of the channel to query
-        
-    Returns:
-        dict: Channel details containing userA, userB, payloadsA, signaturesA, 
-              payloadsB, signaturesB, amount, finalA, finalB, awaitingClosure, unix
     """
-    result = contract.execute("get_channel", [contract.scval.to_uint128(channel_id)])
-    # Parse the Channel struct to a Python dict
-    return {
-        "userA": result["userA"],
-        "userB": result["userB"],
-        "payloadsA": result["payloadsA"],
-        "signaturesA": result["signaturesA"],
-        "payloadsB": result["payloadsB"],
-        "signaturesB": result["signaturesB"],
-        "amount": result["amount"],
-        "finalA": result["finalA"],
-        "finalB": result["finalB"],
-        "awaitingClosure": result["awaitingClosure"],
-        "unix": result["unix"]
-    }
+    return contract.execute("get_channel", None, contract_id, args=[
+        contract.scval.to_uint128(channel_id)
+    ], simulate=True)
 
 
 # Helper utility functions that might be useful when working with this contract
