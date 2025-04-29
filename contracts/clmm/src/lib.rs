@@ -135,6 +135,52 @@ impl CLMM {
         return true;
     }
 
+    pub fn close_position(env: Env, position_id: u128, user: Address) {
+        let mut state: PoolState = get_value(&env, "state");
+        let position = state.positions.get(position_id).unwrap();
+        let mut balance = state.balances.get(user.clone()).unwrap();
+        balance += position.amount_b;
+        state.balances.set(user, balance);
+        state.positions.remove(position_id);
+        set_value(&env, "state", &state);
+        finish_function(env);
+    }
+
+    pub fn get_position(env: Env, position_id: u128) -> Position {
+        let state: PoolState = get_value(&env, "state");
+        return state.positions.get(position_id).unwrap();
+    }
+
+    pub fn get_tick(env: Env, tick_index: i32) -> Tick {
+        let state: PoolState = get_value(&env, "state");
+        return state.ticks.get(tick_index).unwrap();
+    }
+
+    pub fn get_current_price(env: Env) -> u128 {
+        let state: PoolState = get_value(&env, "state");
+        return state.current_price;
+    }
+
+    pub fn get_base_price_at_tick(env: Env) -> u128 {
+        let state: PoolState = get_value(&env, "state");
+        return state.base_price_at_tick;
+    }
+
+    pub fn get_current_tick(env: Env) -> i32 {
+        let state: PoolState = get_value(&env, "state");
+        return state.current_tick;
+    }
+
+    pub fn get_current_liquidity_a(env: Env) -> u128 {
+        let state: PoolState = get_value(&env, "state");
+        return state.current_liquidity_a;
+    }
+
+    pub fn get_current_liquidity_b(env: Env) -> u128 {
+        let state: PoolState = get_value(&env, "state");
+        return state.current_liquidity_b;
+    }
+
     pub fn get_balance(env: Env, user: Address) -> u128 {
         let state: PoolState = get_value(&env, "state");
         return state.balances.try_get(user).unwrap().expect("bruh")
