@@ -1,4 +1,3 @@
-```
 # CLMM (Concentrated Liquidity Market Maker)
 
 A Stellar-based implementation of a Concentrated Liquidity Market Maker (CLMM) using Soroban smart contracts. This project provides a decentralized exchange mechanism with concentrated liquidity pools, enabling efficient token swaps and liquidity provision on the Stellar network.
@@ -288,4 +287,4 @@ For support, please:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
